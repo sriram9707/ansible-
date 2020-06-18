@@ -1,0 +1,56 @@
+provider "aws" {
+   region = "us-east-1"
+}
+provider "external"{}
+
+resource "aws_instance" "lampstack_server" {
+  // EC2 Instance
+
+  ami                    = "ami-01d025118d8e760db"
+  instance_type          = var.instance_type
+  security_groups        = ["${aws_security_group.lampstack_sg.name}"]
+  key_name               = "demo"
+  availability_zone      = "us-east-1c"
+  tags = {
+    Name = "lampstack_instance1"
+  }
+  provisioner "remote-exec" {
+    
+
+    connection {
+      host        = "${aws_instance.lampstack_server.public_ip}"
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = "${file(var.ssh_key_private)}"
+      
+    }
+  }
+
+  provisioner "local-exec" {
+    command      = "ansible-playbook  -i '${self.public_ip},' --private-key ${var.ssh_key_private} lampstack.yml" 
+  }
+}
+resource "aws_security_group" "lampstack_sg" {
+  
+  dynamic "ingress"{
+  for_each    = var.sg-port
+  content{
+  description = "lampstack-sg"
+  from_port   = ingress.value
+  to_port     = ingress.value
+  protocol    = "tcp"
+  cidr_blocks = var.cidr
+  }
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  
+  tags = {
+    Name = "lampstack-sg"
+  }
+}
